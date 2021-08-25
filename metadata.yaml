@@ -1,7 +1,6 @@
 name: nova-compute-nfs
 summary: NFS backend for nova-compute
 maintainer: Mark Lipscombe <mark@lipscombe.com>
-repo: https://github.com/mlipscombe/charm-nova-compute-nfs
 description: |
   Nova is the compute service for the Openstack project.
   .

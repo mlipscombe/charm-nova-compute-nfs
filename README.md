@@ -8,7 +8,7 @@ location.
 
 # Usage
 
-Step by step instructions on using the charm:
+To deploy the charm:
 
 ```
   juju deploy nova-compute-nfs \
