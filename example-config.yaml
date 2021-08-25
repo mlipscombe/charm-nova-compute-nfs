@@ -1,0 +1,5 @@
+nova-compute-nfs:
+  filesystem: 10.10.64.10:/mnt/rpool/nova
+  mountpoint: /srv/nova
+  type: nfs4
+  options: rsize=131072,wsize=131072

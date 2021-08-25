@@ -1,0 +1,28 @@
+options:
+  filesystem:
+    type: string
+    default: 
+    description: "The file system to mount. (ex: 192.168.1.1:/srv/data or /dev/sdb4)"
+  mountpoint:
+    type: string
+    default: "/srv/nova"
+    description: |
+        The path to mount the filesystem at.  To avoid conflicts, do not mount the 
+        filesystem at /var/lib/nova/instances.  If the path does not exist, it
+        will be created.
+  instances-path:
+    type: string
+    default:
+    description: |
+        The final path that will be configured in /etc/nova/nova.conf. Must be a
+        fully qualified path.  If unspecified, the instances path will be set
+        to the mountpoint.
+  type:
+    type: string
+    default: nfs4
+    description: "The filesystem type to be mounted. (ex: nfs4)"
+  options:
+    type: string
+    default: 
+    description: "Mount options."
+
