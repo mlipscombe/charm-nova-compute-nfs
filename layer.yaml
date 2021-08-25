@@ -1,5 +1,4 @@
 includes: 
   - layer:basic
   - layer:apt
-repo: https://github.com/mlipscombe/charm-nova-compute-nfs
-
+repo: https://github.com/mlipscombe/charm-openstack-nfs

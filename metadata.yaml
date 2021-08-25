@@ -1,10 +1,8 @@
-name: nova-compute-nfs
-summary: NFS backend for nova-compute
+name: openstack-nfs
+summary: NFS backend for OpenStack services
 maintainer: Mark Lipscombe <mark@lipscombe.com>
 description: |
-  Nova is the compute service for the Openstack project.
-  .
-  This charm provides a simple NFS backend for Nova.
+  This charm provides a simple NFS backend for Nova and Glance.
 tags:
   # Replace "misc" with one or more whitelisted tags from this list:
   # https://jujucharms.com/docs/stable/authors-charm-metadata
@@ -25,4 +23,6 @@ provides:
   ephemeral-backend:
     interface: ephemeral-backend
     scope: container
-
+  glance-backend:
+    interface: glance-backend
+    scope: container

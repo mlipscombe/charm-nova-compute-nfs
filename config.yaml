@@ -5,18 +5,24 @@ options:
     description: "The file system to mount. (ex: 192.168.1.1:/srv/data or /dev/sdb4)"
   mountpoint:
     type: string
-    default: "/srv/nova"
+    default: "/srv/nfsmount"
     description: |
-        The path to mount the filesystem at.  To avoid conflicts, do not mount the 
-        filesystem at /var/lib/nova/instances.  If the path does not exist, it
+        The path to mount the filesystem at.  If the path does not exist, it
         will be created.
-  instances-path:
+  nova-directory:
     type: string
-    default:
+    default: nova
     description: |
-        The final path that will be configured in /etc/nova/nova.conf. Must be a
-        fully qualified path.  If unspecified, the instances path will be set
-        to the mountpoint.
+        The path that will be configured in /etc/nova/nova.conf. Value is relative
+        to the mountpoint.  If unspecified, the instances path will be set
+        to <mountpoint>/nova.
+  glance-directory:
+    type: string
+    default: glance
+    description: |
+        The path that will be configured in /etc/glance/glance-api.conf. Value is
+        relative to the mountpoint.  If unspecified, the instances path will be set
+        to <mountpoint>/glance.
   type:
     type: string
     default: nfs4
