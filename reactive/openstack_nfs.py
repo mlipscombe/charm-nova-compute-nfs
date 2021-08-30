@@ -4,15 +4,15 @@ import json
 import shutil
 
 from charms.apt import queue_install
-from charms.reactive import when, when_not, set_flag, endpoint_from_flag, hook
+from charms.reactive import when, when_not, set_flag, hook
 from charms.reactive.flags import register_trigger
 
-from charmhelpers.core.hookenv import config, status_set, relation_set, log, relation_ids
+from charmhelpers.core.hookenv import config, status_set, relation_set, relation_ids
 from charmhelpers.core.fstab import Fstab
 from charmhelpers.core.host import mkdir, owner
 
 register_trigger(when='config.changed',
-                 clear_flag='openstack-nfs.configured')
+                 clear_flag='openstack-nfs.installed')
 
 
 @when_not('openstack-nfs.installed')
@@ -28,57 +28,40 @@ def set_installed_message():
     status_set('maintenance', 'performing setup')
 
 
-@when_not('openstack-nfs.configured')
-@when('openstack-nfs.installed')
-def configure():
-    device = config('filesystem')
-    mountpoint = config('mountpoint')
-    filesystem_type = config('type')
-    options = config('options')
+@hook('ephemeral-backend-relation-changed')
+def nova_compute_changed():
+    status_set('maintenance', 'nova-compute connected')
+    set_flag('nova-compute.connected')
 
-    set_flag('openstack-nfs.configured')
 
-    if not device:
-        status_set('blocked', 'waiting for filesystem configuration')
+@hook('glance-backend-relation-changed')
+def glance_changed():
+    status_set('maintenance', 'glance connected')
+    set_flag('glance.connected')
+
+
+@when('nova-compute.connected', 'openstack-nfs.installed')
+def update_nova_config():
+    status_set('maintenance', 'configuring nova-compute')
+    filesystem = config('nova-compute-filesystem')
+    mountpoint = config('nova-compute-mountpoint')
+    fstype = config('nova-compute-fstype')
+    fsoptions = config('nova-compute-fsoptions')
+
+    if filesystem is None:
+        status_set('blocked', 'nova-compute-filesystem not set')
         return
 
-    fstab = Fstab()
-
-    existing_entry = fstab.get_entry_by_attr('mountpoint', mountpoint)
-    if existing_entry:
-        try:
-            status_set('maintenance', 'unmounting existing filesystem')
-            subprocess.check_output(
-                ['umount', mountpoint], timeout=config('mount-timeout')
-            )
-            fstab.remove_entry(existing_entry)
-        except subprocess.TimeoutExpired:
-            status_set('blocked', 'Timed out unmounting existing filesystem.')
-            return
-        except subprocess.CalledProcessError:
-            status_set('blocked', 'Error unmounting existing filesystem.')
-            return
-
-    Fstab.add(device, mountpoint, filesystem_type, options)
-    set_flag('openstack-nfs.mount')
-
-
-@when('openstack-nfs.mount')
-def mount():
-    mountpoint = config('mountpoint')
-
-    if not os.path.exists(mountpoint):
-        try:
-            mkdir(mountpoint, force=True)
-        except PermissionError:
-            status_set(
-                'blocked', 'insufficient permissions to create {}'.format(mountpoint))
-            return
+    add_to_fstab(filesystem, mountpoint, fstype, fsoptions)
+    try:
+        create_or_chown_path(mountpoint, 'nova', 'nova')
+    except PermissionError:
+        status_set(
+            'error', 'insufficient permissions to create {}'.format(mountpoint))
+        return
 
     try:
-        subprocess.check_output(
-            ['mount', '-a'], timeout=config('mount-timeout')
-        )
+        mount_filesystem_by_path(mountpoint)
     except subprocess.TimeoutExpired:
         status_set('blocked', 'Timed out on mount. Check configuration.')
         return
@@ -86,34 +69,12 @@ def mount():
         status_set('blocked', 'Mount error. Check configuraton.')
         return
 
-    status_set('maintenance',
-               'filesystem mounted successfully, waiting for relations')
-    set_flag('openstack-nfs.ready')
-
-
-@hook('ephemeral-backend-relation-changed')
-def nova_compute_changed():
-    status_set('maintenance', 'nova-compute connected, but not yet configured')
-    set_flag('nova-compute.connected')
-
-
-@hook('glance-backend-relation-changed')
-def glance_changed():
-    status_set('maintenance', 'glance connected, but not yet configured')
-    set_flag('glance.connected')
-
-
-@when('nova-compute.connected', 'openstack-nfs.ready')
-def update_nova_config():
-    status_set('maintenance', 'configuring nova-compute')
-    path = os.path.join(config('mountpoint'), config('nova-path'))
-    create_or_chown_path(path)
     ctx = {
         'nova': {
             '/etc/nova/nova.conf': {
                 'sections': {
                     'DEFAULT': [
-                        ('instances_path', path)
+                        ('instances_path', mountpoint)
                     ]
                 }
             }
@@ -121,21 +82,44 @@ def update_nova_config():
     }
     for r in relation_ids('ephemeral-backend'):
         relation_set(r, subordinate_configuration=json.dumps(ctx))
-    status_set('active', 'filesystem mounted and config applied')
+    status_set('active', 'mounted at {}'.format(mountpoint))
 
 
-@when('glance.connected', 'openstack-nfs.ready')
+@when('glance.connected', 'openstack-nfs.installed')
 def update_glance_config():
     status_set('maintenance', 'configuring glance')
-    path = os.path.join(config('mountpoint'), config('glance-path'))
-    create_or_chown_path(path)
+    filesystem = config('glance-filesystem')
+    mountpoint = config('glance-mountpoint')
+    fstype = config('glance-fstype')
+    fsoptions = config('glance-fsoptions')
+
+    if filesystem is None:
+        status_set('blocked', 'glance-filesystem not set')
+        return
+
+    add_to_fstab(filesystem, mountpoint, fstype, fsoptions)
+    try:
+        create_or_chown_path(mountpoint, 'glance', 'glance')
+    except PermissionError:
+        status_set(
+            'error', 'insufficient permissions to create {}'.format(mountpoint))
+        return
+
+    try:
+        mount_filesystem_by_path(mountpoint)
+    except subprocess.TimeoutExpired:
+        status_set('blocked', 'Timed out on mount. Check configuration.')
+        return
+    except subprocess.CalledProcessError:
+        status_set('blocked', 'Mount error. Check configuraton.')
+        return
 
     ctx = {
         'glance': {
-            '/etc/glance/glance.conf': {
+            '/etc/glance/glance-api.conf': {
                 'sections': {
-                    'DEFAULT': [
-                        ('instances_path', path)
+                    'glance_store': [
+                        ('filesystem_store_datadir', mountpoint)
                     ]
                 }
             }
@@ -143,23 +127,32 @@ def update_glance_config():
     }
     for r in relation_ids('glance-backend'):
         relation_set(r, subordinate_configuration=json.dumps(ctx))
-    status_set('active', 'filesystem mounted and config applied')
+    status_set('active', 'mounted at {}'.format(mountpoint))
 
 
 def create_or_chown_path(path, user, group):
     if not os.path.exists(path):
-        try:
-            mkdir(path, owner=user, group=group)
-        except PermissionError:
-            status_set(
-                'blocked', 'unsufficient permissions to create {}'.format(path))
-            return
+        mkdir(path, owner=user, group=group)
 
     path_owner = owner(path)
     if path_owner != (user, group):
-        try:
-            shutil.chown(path, user, group)
-        except PermissionError:
-            status_set(
-                'blocked', 'insufficient permissions to chown {} to {}'.format(path, user))
-            return
+        shutil.chown(path, user, group)
+
+
+def add_to_fstab(filesystem, mountpoint, fstype, fsoptions):
+    fstab = Fstab()
+
+    existing_entry = fstab.get_entry_by_attr('mountpoint', filesystem)
+    if existing_entry:
+        fstab.remove_entry(existing_entry)
+
+    Fstab.add(filesystem, mountpoint, fstype, fsoptions)
+
+
+def mount_filesystem_by_path(mountpoint):
+    if not os.path.exists(mountpoint):
+        mkdir(mountpoint, force=True)
+
+    subprocess.check_output(
+        ['mount', mountpoint], timeout=config('mount-timeout')
+    )

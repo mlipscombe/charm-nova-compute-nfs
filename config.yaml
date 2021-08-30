@@ -1,34 +1,39 @@
 options:
-  filesystem:
+  nova-compute-filesystem:
     type: string
-    default: 
-    description: "The file system to mount. (ex: 192.168.1.1:/srv/data or /dev/sdb4)"
-  mountpoint:
-    type: string
-    default: "/srv/nfsmount"
+    default:
     description: |
-        The path to mount the filesystem at.  If the path does not exist, it
-        will be created.
-  nova-directory:
+      The filesystem to mount when connected to nova-compute.
+  nova-compute-mountpoint:
     type: string
-    default: nova
+    default: "/srv/nova"
     description: |
-        The path that will be configured in /etc/nova/nova.conf. Value is relative
-        to the mountpoint.  If unspecified, the instances path will be set
-        to <mountpoint>/nova.
-  glance-directory:
-    type: string
-    default: glance
-    description: |
-        The path that will be configured in /etc/glance/glance-api.conf. Value is
-        relative to the mountpoint.  If unspecified, the instances path will be set
-        to <mountpoint>/glance.
-  type:
+        The path to mount the filesystem at for nova-compute relations.
+        If the path does not exist, it will be created.
+  nova-compute-fstype:
     type: string
     default: nfs4
     description: "The filesystem type to be mounted. (ex: nfs4)"
-  options:
+  nova-compute-fsoptions:
     type: string
     default: 
     description: "Mount options."
-
+  glance-filesystem:
+    type: string
+    default:
+    description: |
+      The filesystem to mount when connected to glance.
+  glance-mountpoint:
+    type: string
+    default: "/srv/glance"
+    description: |
+        The path to mount the filesystem at for glance relations.  If the path
+        does not exist, it will be created.
+  glance-fstype:
+    type: string
+    default: nfs4
+    description: "The filesystem type to be mounted. (ex: nfs4)"
+  glance-fsoptions:
+    type: string
+    default: 
+    description: "Mount options."

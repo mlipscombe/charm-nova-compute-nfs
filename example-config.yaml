@@ -1,7 +1,6 @@
 openstack-nfs:
-  filesystem: 10.10.64.10:/mnt/rpool/openstack
+  nova-compute-filesystem: 10.10.64.10:/mnt/rpool/nova
+  glance-filesystem: 10.10.64.10:/mnt/rpool/glance
   mountpoint: /srv/nfsmount
-  glance-path: glance
-  nova-path: nova
   type: nfs4
   options: rsize=131072,wsize=131072
